@@ -11,6 +11,7 @@ import { AnthropicProvider } from "../providers/anthropic.js";
 import { OpenAICompatibleProvider } from "../providers/openai-compatible.js";
 import { GoogleProvider } from "../providers/google.js";
 import { LocalProvider } from "../providers/local.js";
+import { OpenRouterProvider } from "../providers/openrouter.js";
 import { SessionManager } from "../session/manager.js";
 import { CostGovernor } from "../cost/governor.js";
 import { parseCommand, getCommand, type CommandContext } from "../commands/registry.js";
@@ -30,6 +31,7 @@ function createProvider(providerId: string): Provider | undefined {
     case "openai": return new OpenAIProvider(cfg);
     case "anthropic": return new AnthropicProvider(cfg);
     case "google": return new GoogleProvider(cfg);
+    case "openrouter": return new OpenRouterProvider(cfg);
     case "ollama": case "lmstudio": return new LocalProvider(cfg);
     default: return new OpenAICompatibleProvider(cfg);
   }

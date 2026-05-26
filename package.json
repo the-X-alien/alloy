@@ -15,8 +15,16 @@
     "url": "https://github.com/the-X-alien/alloy/issues"
   },
   "license": "MIT",
-  "keywords": ["ai", "coding-agent", "cli", "llm", "multi-model"],
-  "files": ["dist"],
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "cli",
+    "llm",
+    "multi-model"
+  ],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -26,6 +34,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@openrouter/ai-sdk-provider": "^2.9.0",
     "ink": "^4.4.1",
     "openai": "^4.85.0",
     "picocolors": "^1.1.1",

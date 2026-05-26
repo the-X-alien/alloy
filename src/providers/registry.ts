@@ -95,6 +95,13 @@ const PROVIDERS: ProviderConfig[] = [
     apiKeyHint: "from openrouter.ai",
     models: [
       { id: "openrouter/auto", provider: "openrouter", costPerInputToken: 0, costPerOutputToken: 0, contextWindow: 128000 },
+      { id: "anthropic/claude-sonnet-4-20250514", provider: "openrouter", costPerInputToken: 3.00, costPerOutputToken: 15.00, contextWindow: 200000 },
+      { id: "anthropic/claude-3.5-haiku", provider: "openrouter", costPerInputToken: 0.80, costPerOutputToken: 4.00, contextWindow: 200000 },
+      { id: "openai/gpt-4o", provider: "openrouter", costPerInputToken: 2.50, costPerOutputToken: 10.00, contextWindow: 128000 },
+      { id: "openai/gpt-4o-mini", provider: "openrouter", costPerInputToken: 0.15, costPerOutputToken: 0.60, contextWindow: 128000 },
+      { id: "google/gemini-2.5-pro-exp-03-25", provider: "openrouter", costPerInputToken: 1.50, costPerOutputToken: 5.00, contextWindow: 1048576 },
+      { id: "deepseek/deepseek-r1", provider: "openrouter", costPerInputToken: 1.00, costPerOutputToken: 5.00, contextWindow: 128000 },
+      { id: "qwen/qwq-32b", provider: "openrouter", costPerInputToken: 0.30, costPerOutputToken: 1.20, contextWindow: 32000 },
     ],
   },
   {
