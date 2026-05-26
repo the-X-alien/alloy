@@ -2,6 +2,8 @@
 import { StrictMode } from "react";
 import { render } from "ink";
 import { App } from "./tui/app.js";
+import { trySetStuckKey } from "./tui/onboarding/index.js";
+import { getProviderConfigs } from "./providers/registry.js";
 import { detectTools, importFrom, importAll, applyImport } from "./migrate/importer.js";
 import { uninstall } from "./uninstall.js";
 
@@ -72,6 +74,13 @@ Config:
   ~/.alloy/skills/ Skill plugins
 `);
     process.exit(0);
+  }
+
+  const configs = getProviderConfigs();
+  const hasAnyKey = configs.some(c => !!process.env[c.apiKeyEnv]);
+
+  if (!hasAnyKey) {
+    trySetStuckKey("stuck");
   }
 
   const { waitUntilExit, clear } = render(

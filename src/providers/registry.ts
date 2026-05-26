@@ -250,6 +250,8 @@ export function getProviderConfig(id: string): ProviderConfig | undefined {
   return PROVIDERS.find(p => p.id === id);
 }
 
+export const getProviderConfigs = getProviders;
+
 export function getModelCost(providerId: string, modelId: string): { input: number; output: number } | undefined {
   const p = PROVIDERS.find(p => p.id === providerId);
   if (!p) return undefined;
