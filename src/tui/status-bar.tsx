@@ -1,6 +1,6 @@
 import React from "react";
 import { Text, Box } from "ink";
-import { COLORS } from "./theme.js";
+import { COLORS, providerColor, formatCost } from "./theme.js";
 import type { Session } from "../session/manager.js";
 
 interface StatusBarProps {
@@ -15,6 +15,7 @@ interface StatusBarProps {
 export function StatusBar({ session, provider, model, spent, budget, messages }: StatusBarProps) {
   const remaining = budget - spent;
   const costColor = remaining < 1 ? COLORS.error : remaining < 3 ? COLORS.warning : COLORS.success;
+  const pColor = providerColor(provider);
 
   return (
     <Box
@@ -23,29 +24,30 @@ export function StatusBar({ session, provider, model, spent, budget, messages }:
       paddingX={1}
       justifyContent="space-between"
       width="100%"
+      flexShrink={0}
     >
       <Box gap={2}>
-        <Box>
-          <Text color={COLORS.textDim}>{"session: "}</Text>
-          <Text color={COLORS.textBright}>{session?.title ?? "none"}</Text>
-        </Box>
-        <Box>
-          <Text color={COLORS.textDim}>{"msgs: "}</Text>
+        <Text color={COLORS.textDim}>
+          {"session: "}
+          <Text color={COLORS.textBright}>{session?.title ?? "default"}</Text>
+        </Text>
+        <Text color={COLORS.textDim}>
+          {"msgs: "}
           <Text color={COLORS.text}>{String(messages)}</Text>
-        </Box>
+        </Text>
       </Box>
       <Box gap={2}>
-        <Box>
-          <Text color={COLORS.textDim}>{"model: "}</Text>
-          <Text color={COLORS.accent}>{provider}</Text>
-          <Text color={COLORS.text}>{"/"}</Text>
-          <Text color={COLORS.accentDim}>{model}</Text>
-        </Box>
-        <Box>
-          <Text color={COLORS.textDim}>{"cost: "}</Text>
-          <Text color={costColor}>{`$${spent.toFixed(4)}`}</Text>
+        <Text color={COLORS.textDim}>
+          {"model: "}
+          <Text color={pColor}>{provider}</Text>
+          <Text color={COLORS.textDim}>/</Text>
+          <Text color={COLORS.text}>{model}</Text>
+        </Text>
+        <Text color={COLORS.textDim}>
+          {"cost: "}
+          <Text color={costColor}>{formatCost(spent)}</Text>
           <Text color={COLORS.textDim}>{` / $${budget.toFixed(2)}`}</Text>
-        </Box>
+        </Text>
       </Box>
     </Box>
   );

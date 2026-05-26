@@ -1,15 +1,27 @@
 {
-  "name": "alloy",
-  "version": "0.0.1",
+  "name": "alloy-cli",
+  "version": "0.1.0",
   "description": "Multi-model AI coding agent — combine the best, avoid the rest",
   "type": "module",
   "bin": {
     "alloy": "dist/cli.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/the-X-alien/alloy.git"
+  },
+  "homepage": "https://github.com/the-X-alien/alloy#readme",
+  "bugs": {
+    "url": "https://github.com/the-X-alien/alloy/issues"
+  },
+  "license": "MIT",
+  "keywords": ["ai", "coding-agent", "cli", "llm", "multi-model"],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "start": "alloy",
+    "prepublishOnly": "npm run build",
     "link": "npm link"
   },
   "dependencies": {

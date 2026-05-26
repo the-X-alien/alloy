@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { Text, Box } from "ink";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { Text, Box, useInput } from "ink";
 import { StatusBar } from "./status-bar.js";
-import { Chat } from "./chat.js";
-import { Logo, COLORS, providerColor } from "./theme.js";
+import { Home } from "./home.js";
+import { Session } from "./session.js";
+import { COLORS } from "./theme.js";
 import { getModels, getProviderConfig, getModelCost } from "../providers/registry.js";
 import type { ChatMessage, Provider } from "../providers/interface.js";
 import { OpenAIProvider } from "../providers/openai.js";
@@ -14,7 +15,7 @@ import { SessionManager } from "../session/manager.js";
 import { CostGovernor } from "../cost/governor.js";
 import { parseCommand, getCommand, type CommandContext } from "../commands/registry.js";
 import { SkillManager } from "../skills/manager.js";
-import { detectTools, importFrom, importAll, applyImport } from "../migrate/importer.js";
+import { detectTools, importAll, applyImport } from "../migrate/importer.js";
 import { uninstall } from "../uninstall.js";
 
 const allModels = getModels();
@@ -51,17 +52,59 @@ function getConfiguredProviders() {
   return result;
 }
 
+function HelpDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={COLORS.accent} padding={1}>
+      <Text bold color={COLORS.accent}>{"Alloy Help"}</Text>
+      <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
+      <Text bold color={COLORS.textBright}>{"Slash Commands"}</Text>
+      <Text color={COLORS.text}>{"  /help         Show this help"}</Text>
+      <Text color={COLORS.text}>{"  /models       List available models"}</Text>
+      <Text color={COLORS.text}>{"  /providers    List configured providers"}</Text>
+      <Text color={COLORS.text}>{"  /model <name> Switch model"}</Text>
+      <Text color={COLORS.text}>{"  /provider <n>  Switch provider"}</Text>
+      <Text color={COLORS.text}>{"  /clear        Clear conversation"}</Text>
+      <Text color={COLORS.text}>{"  /new          New session"}</Text>
+      <Text color={COLORS.text}>{"  /sessions     List sessions"}</Text>
+      <Text color={COLORS.text}>{"  /status       Show session status"}</Text>
+      <Text color={COLORS.text}>{"  /skills       List loaded skills"}</Text>
+      <Text color={COLORS.text}>{"  /compact      Compact session context"}</Text>
+      <Text color={COLORS.text}>{"  /copy         Copy last response"}</Text>
+      <Text color={COLORS.text}>{"  /version      Show version"}</Text>
+      <Text color={COLORS.text}>{"  /import       Import configs from other tools"}</Text>
+      <Text color={COLORS.text}>{"  /exit         Quit Alloy"}</Text>
+      <Text color={COLORS.text}>{"  /uninstall    Remove Alloy"}</Text>
+      <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
+      <Text bold color={COLORS.textBright}>{"Keyboard Shortcuts"}</Text>
+      <Text color={COLORS.text}>{"  Ctrl+L        Toggle help"}</Text>
+      <Text color={COLORS.text}>{"  Ctrl+1-9      Quick-switch model"}</Text>
+      <Text color={COLORS.text}>{"  Escape        Quit"}</Text>
+      <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
+      <Text color={COLORS.accent}>{"Press Escape to close"}</Text>
+    </Box>
+  );
+}
+
 export function App() {
-  const [selected, setSelected] = useState(() => findAvailableModel());
+  const [input, setInput] = useState("");
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [historyIdx, setHistoryIdx] = useState(-1);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState("");
+  const [selected, setSelected] = useState(() => findAvailableModel());
   const [providerInst, setProviderInst] = useState<Provider | undefined>(() => createProvider(selected.provider));
   const [notification, setNotification] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const inputRef = useRef(input);
+  inputRef.current = input;
+
+  const hasMessages = messages.length > 0 || streaming;
 
   useEffect(() => {
     if (notification) {
-      const t = setTimeout(() => setNotification(null), 3000);
+      const t = setTimeout(() => setNotification(null), 4000);
       return () => clearTimeout(t);
     }
   }, [notification]);
@@ -69,6 +112,20 @@ export function App() {
   const switchModel = useCallback((model: string, providerId: string) => {
     setSelected({ model, provider: providerId });
     setProviderInst(createProvider(providerId));
+  }, []);
+
+  const submit = useCallback(() => {
+    const text = inputRef.current.trim();
+    if (!text) return;
+    setInputHistory(prev => [text, ...prev].slice(0, 100));
+    setHistoryIdx(-1);
+    setInput("");
+
+    if (text.startsWith("/")) {
+      handleCommand(text);
+    } else {
+      handleSend(text);
+    }
   }, []);
 
   useEffect(() => {
@@ -83,7 +140,6 @@ export function App() {
     }
   }, []);
 
-  // Auto-import from detected tools on first launch
   useEffect(() => {
     const detected = detectTools();
     const found = detected.filter(d => d.detected);
@@ -96,7 +152,6 @@ export function App() {
       }
       if (imported > 0) {
         setNotification(`Imported keys from: ${found.map(f => f.tool).join(", ")}`);
-        // Re-evaluate configured providers
         for (const m of allModels) {
           const p = createProvider(m.provider);
           if (p?.configured) {
@@ -108,10 +163,74 @@ export function App() {
     }
   }, []);
 
+  useInput((_input, key) => {
+    if (key.escape) {
+      if (showHelp) { setShowHelp(false); return; }
+      process.exit(0);
+      return;
+    }
+
+    if (key.ctrl && _input.toLowerCase() === "l") {
+      setShowHelp(prev => !prev);
+      return;
+    }
+
+    if (key.ctrl && /^[1-9]$/.test(_input)) {
+      const idx = parseInt(_input) - 1;
+      const configured = getConfiguredProviders();
+      if (idx < configured.length) {
+        switchModel(configured[idx].modelId, configured[idx].providerId);
+      }
+      return;
+    }
+
+    if (showHelp) return;
+
+    if (key.return) {
+      if (key.shift) {
+        setInput(prev => prev + "\n");
+        return;
+      }
+      submit();
+      return;
+    }
+
+    if (key.backspace || key.delete) {
+      setInput(prev => prev.slice(0, -1));
+      return;
+    }
+
+    if (key.upArrow) {
+      setHistoryIdx(prev => {
+        const next = Math.min(prev + 1, inputHistory.length - 1);
+        if (next >= 0 && next < inputHistory.length) {
+          setInput(inputHistory[next]);
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (key.downArrow) {
+      setHistoryIdx(prev => {
+        const next = Math.max(prev - 1, -1);
+        if (next === -1) setInput("");
+        else if (next < inputHistory.length) setInput(inputHistory[next]);
+        return next;
+      });
+      return;
+    }
+
+    if (_input && !key.ctrl && !key.meta) {
+      setInput(prev => prev + _input);
+      return;
+    }
+  });
+
   const handleCommand = useCallback(async (cmdText: string) => {
     const parsed = parseCommand(cmdText);
     if (!parsed) {
-      setNotification(`Unknown command: ${cmdText}`);
+      setNotification(`Unknown command: ${cmdText}. Try /help`);
       return;
     }
 
@@ -158,11 +277,12 @@ export function App() {
         case "exit":
           process.exit(0);
           break;
-        case "uninstall":
+        case "uninstall": {
           const msgs = uninstall();
           setNotification(msgs.join("\n"));
           setTimeout(() => process.exit(0), 2000);
           break;
+        }
       }
     }
 
@@ -186,8 +306,7 @@ export function App() {
 
     if (!prov.configured) {
       const cfg = getProviderConfig(selected.provider);
-      const hint = cfg?.apiKeyHint ?? `${cfg?.apiKeyEnv ?? "API key"}`;
-      setStreamContent(`${prov.name} not configured.\nSet ${cfg?.apiKeyEnv ?? "${provider}_API_KEY"} (${hint})`);
+      setStreamContent(`${prov.name} not configured. Set ${cfg?.apiKeyEnv ?? "${provider}_API_KEY"}`);
       setStreaming(false);
       return;
     }
@@ -228,52 +347,39 @@ export function App() {
     }
   }, [messages, selected, providerInst]);
 
-  const current = sessions.current;
-  const configuredCount = getConfiguredProviders().length;
-  const configured = getConfiguredProviders();
+  const content = showHelp ? (
+    <HelpDialog onClose={() => setShowHelp(false)} />
+  ) : !hasMessages ? (
+    <Home input={input} />
+  ) : (
+    <Session
+      messages={messages}
+      streaming={streaming}
+      streamContent={streamContent}
+      input={input}
+    />
+  );
 
   return (
     <Box flexDirection="column" width="100%" height="100%">
-      <Box justifyContent="space-between" paddingX={1} paddingY={0}>
-        <Box flexDirection="column">
-          <Logo />
-        </Box>
-        <Box flexDirection="column" alignItems="flex-end" gap={0}>
-          <Text color={configuredCount > 0 ? COLORS.success : COLORS.warning}>
-            {configuredCount > 0 ? `${configuredCount} models \u2713` : "No API keys found"}
-          </Text>
-          <Text color={COLORS.textDim}>
-            {"Ctrl+L help | Esc quit"}
-          </Text>
-        </Box>
-      </Box>
-
       {notification && (
-        <Box borderStyle="round" borderColor={COLORS.accent} paddingX={1} marginY={0}>
+        <Box borderStyle="round" borderColor={COLORS.accent} paddingX={1} flexShrink={0}>
           <Text color={COLORS.textBright}>{notification}</Text>
         </Box>
       )}
-
-      <Chat
-        messages={messages}
-        onSend={handleSend}
-        streaming={streaming}
-        streamContent={streamContent}
-        models={allModels}
-        currentModel={selected.model}
-        currentProvider={selected.provider}
-        onModelChange={switchModel}
-        onCommand={handleCommand}
-      />
-
-      <StatusBar
-        session={current}
-        provider={selected.provider}
-        model={selected.model}
-        spent={governor.getSpent()}
-        budget={governor.getBudget()}
-        messages={messages.length}
-      />
+      <Box flexGrow={1} minHeight={0} flexDirection="column">
+        {content}
+      </Box>
+      <Box flexShrink={0}>
+        <StatusBar
+          session={sessions.current}
+          provider={selected.provider}
+          model={selected.model}
+          spent={governor.getSpent()}
+          budget={governor.getBudget()}
+          messages={messages.length}
+        />
+      </Box>
     </Box>
   );
 }

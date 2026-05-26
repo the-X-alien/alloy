@@ -1,4 +1,5 @@
 import { Text, Box } from "ink";
+import React from "react";
 
 export const COLORS = {
   accent: "#7C5CFC",
@@ -31,12 +32,6 @@ export const COLORS = {
   },
 };
 
-export type Theme = "dark" | "light";
-
-export function detectTheme(): Theme {
-  return "dark";
-}
-
 export const LOGO_ASCII = [
   "    _    _ _                 ",
   "   / \\  | | | ___  _   _    ",
@@ -47,7 +42,7 @@ export const LOGO_ASCII = [
   "  multi-model AI coding agent",
 ];
 
-export const LOGO_COLORS = [
+const LOGO_COLORS = [
   COLORS.accent,
   COLORS.accentDim,
   COLORS.accentBright,
@@ -57,17 +52,9 @@ export const LOGO_COLORS = [
   COLORS.textDim,
 ];
 
-function LogoLine({ text, color, bold }: { text: string; color: string; bold?: boolean }) {
-  return (
-    <Text color={color} bold={bold ?? false}>
-      {text}
-    </Text>
-  );
-}
-
 export function Logo() {
   return (
-    <Box flexDirection="column" marginLeft={0}>
+    <Box flexDirection="column">
       {LOGO_ASCII.slice(0, 6).map((line, i) => (
         <Box key={`logo-${i}`}>
           <Text color={LOGO_COLORS[i]} bold>{line}</Text>
@@ -88,11 +75,16 @@ export function MiniLogo() {
       <Text bold color={COLORS.accentBright}>{"l"}</Text>
       <Text bold color={COLORS.success}>{"o"}</Text>
       <Text bold color={COLORS.warning}>{"y"}</Text>
-      <Text color={COLORS.textDim}>{" v0.0.1"}</Text>
+      <Text color={COLORS.textDim}>{" v0.1.0"}</Text>
     </Box>
   );
 }
 
 export function providerColor(provider: string): string {
   return (COLORS.provider as any)[provider] ?? COLORS.provider.default;
+}
+
+export function formatCost(cents: number): string {
+  if (cents < 0.01) return "<$0.0001";
+  return `$${cents.toFixed(4)}`;
 }
