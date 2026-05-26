@@ -1,0 +1,28 @@
+{
+  "name": "alloy",
+  "version": "0.0.1",
+  "description": "Multi-model AI coding agent — combine the best, avoid the rest",
+  "type": "module",
+  "bin": {
+    "alloy": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "alloy",
+    "link": "npm link"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "ink": "^4.4.1",
+    "openai": "^4.85.0",
+    "picocolors": "^1.1.1",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.29",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0"
+  }
+}
