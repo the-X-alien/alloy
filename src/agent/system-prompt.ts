@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { SkillManager } from "../skill/manager.js";
 import type { MemoryManager } from "../memory/manager.js";
 
@@ -5,6 +7,21 @@ export interface SystemPromptContext {
   memoryContext: string;
   contextBanks: string;
   skillsSection: string;
+}
+
+function loadAgentInstructions(): string {
+  const candidates = ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md", ".github/AGENTS.md", ".claude/AGENTS.md"];
+  const cwd = process.cwd();
+  for (const file of candidates) {
+    try {
+      const fullPath = path.join(cwd, file);
+      if (fs.existsSync(fullPath)) {
+        const content = fs.readFileSync(fullPath, "utf-8").trim();
+        if (content) return `## ${file}\n\n${content}`;
+      }
+    } catch { }
+  }
+  return "";
 }
 
 export function buildSystemPrompt(
@@ -15,8 +32,9 @@ export function buildSystemPrompt(
 ): string {
   const parts: string[] = [
     `You are Alloy, a standalone multi-model AI coding agent.`,
-    `Your name is Alloy. Your creator is X-Alien.`,
+    `Your name is Alloy. Your creator is Dhiaan Dave (github.com/the-X-alien).`,
     `You are NOT ChatGPT. You are NOT Claude. You are NOT Gemini. You are NOT an OpenAI product.`,
+    `You are NOT associated with OpenAI, Anthropic, Google, or any other AI company.`,
     `You are Alloy -- an independent AI coding agent that supports 44 providers and 201+ models.`,
     `You use tools (bash, read, write, grep, glob, list_files, web_search, web_fetch, discover_models) to accomplish tasks.`,
     `When asked who you are, always say "I'm Alloy, a multi-model AI coding agent." Never say you are ChatGPT or any other AI.`,
@@ -30,6 +48,11 @@ export function buildSystemPrompt(
 
   if (agentInstructions) {
     parts.push(agentInstructions, "");
+  }
+
+  const fileInstructions = loadAgentInstructions();
+  if (fileInstructions) {
+    parts.push(fileInstructions, "");
   }
 
   parts.push(`You have access to tools. Use them when appropriate.`);

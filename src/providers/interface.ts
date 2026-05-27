@@ -2,8 +2,8 @@ export interface ModelConfig {
   id: string;
   name: string;
   provider: string;
-  costPerInputToken: number;  // per 1M tokens USD
-  costPerOutputToken: number; // per 1M tokens USD
+  costPerInputToken: number;
+  costPerOutputToken: number;
   contextWindow: number;
 }
 
@@ -23,6 +23,7 @@ export interface ChatMessage {
   timestamp: number;
   toolCalls?: { id?: string; name: string; arguments: Record<string, unknown> }[];
   toolName?: string;
+  toolCallId?: string;
 }
 
 export interface ChatOptions {
@@ -33,10 +34,18 @@ export interface ChatOptions {
   tools?: Record<string, unknown>[];
 }
 
+export type StreamEvent =
+  | { type: "text"; content: string }
+  | { type: "tool_call_start"; id: string; name: string; }
+  | { type: "tool_call_delta"; id: string; delta: string; }
+  | { type: "tool_call_end"; id: string; }
+  | { type: "reasoning"; content: string }
+  | { type: "error"; message: string; }
+
 export interface Provider {
   id: string;
   name: string;
   configured: boolean;
-  chat(messages: ChatMessage[], opts: ChatOptions): AsyncIterable<string>;
+  chat(messages: ChatMessage[], opts: ChatOptions): AsyncIterable<StreamEvent>;
   estimateCost(model: string, inputTokens: number, outputTokens: number): number;
 }

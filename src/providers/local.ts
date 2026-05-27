@@ -1,4 +1,4 @@
-import type { Provider, ChatMessage, ChatOptions, ProviderConfig } from "./interface.js";
+import type { Provider, ChatMessage, ChatOptions, ProviderConfig, StreamEvent } from "./interface.js";
 
 export class LocalProvider implements Provider {
   id: string;
@@ -20,8 +20,18 @@ export class LocalProvider implements Provider {
 
     const body = {
       model: opts.model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
+        ...(m.toolCalls ? { tool_calls: m.toolCalls.map(tc => ({
+          id: tc.id ?? "",
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })) } : {}),
+      })),
       stream: true,
+      ...(opts.tools && opts.tools.length > 0 ? { tools: opts.tools } : {}),
     };
 
     const headers: Record<string, string> = {
@@ -38,13 +48,12 @@ export class LocalProvider implements Provider {
       });
 
       if (!resp.ok) {
-        yield `${this.name} not reachable at ${this.baseUrl}\nMake sure it's running. Try: ollama serve\n`;
-        yield `Error: ${resp.status} ${resp.statusText}`;
+        yield { type: "error" as const, message: `${this.name} not reachable at ${this.baseUrl}\nMake sure it's running. Try: ollama serve\nError: ${resp.status} ${resp.statusText}` };
         return;
       }
 
       const reader = resp.body?.getReader();
-      if (!reader) { yield "Error: No body"; return; }
+      if (!reader) { yield { type: "error" as const, message: "No body" }; return; }
 
       const decoder = new TextDecoder();
       let buffer = "";
@@ -63,16 +72,29 @@ export class LocalProvider implements Provider {
             if (data === "[DONE]") return;
             try {
               const json = JSON.parse(data);
-              const delta = json.choices?.[0]?.delta?.content;
-              if (delta) yield delta;
+              const choice = json.choices?.[0];
+              if (!choice) continue;
+
+              const content = choice.delta?.content;
+              if (content) yield { type: "text" as const, content };
+
+              const toolCalls = choice.delta?.tool_calls;
+              if (toolCalls) {
+                for (const tc of toolCalls) {
+                  if (tc.id) {
+                    yield { type: "tool_call_start" as const, id: tc.id, name: tc.function?.name ?? "" };
+                  }
+                  if (tc.function?.arguments) {
+                    yield { type: "tool_call_delta" as const, id: tc.id ?? tc.index?.toString() ?? "", delta: tc.function.arguments };
+                  }
+                }
+              }
             } catch { }
           }
         }
       }
     } catch (err: any) {
-      yield `${this.name} not reachable at ${this.baseUrl}\n`;
-      yield `Make sure it's running. Install from ollama.com or lmstudio.ai\n`;
-      yield `Error: ${err?.message ?? "Connection refused"}`;
+      yield { type: "error" as const, message: `${this.name} not reachable at ${this.baseUrl}\nMake sure it's running.\nError: ${err?.message ?? "Connection refused"}` };
     }
   }
 

@@ -1,5 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
-import type { Provider, ChatMessage, ChatOptions, ProviderConfig } from "./interface.js";
+import type { Provider, ChatMessage, ChatOptions, ProviderConfig, StreamEvent } from "./interface.js";
 
 function sha256(data: string): string {
   return createHash("sha256").update(data, "utf-8").digest("hex");
@@ -37,7 +37,7 @@ export class BedrockProvider implements Provider {
 
   async *chat(messages: ChatMessage[], opts: ChatOptions) {
     if (!this.accessKey || !this.secretKey) {
-      yield "Error: AWS credentials not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.";
+      yield { type: "error" as const, message: "AWS credentials not configured. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY." };
       return;
     }
 
@@ -50,13 +50,28 @@ export class BedrockProvider implements Provider {
     const systemMsg = messages.find(m => m.role === "system");
     const nonSystem = messages.filter(m => m.role !== "system");
 
+    const bodyContent: any[] = nonSystem.map(m => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: [
+        ...(m.content ? [{ text: m.content }] : []),
+        ...(m.toolCalls ? m.toolCalls.map(tc => ({
+          toolUse: { toolUseId: tc.id ?? "", name: tc.name, input: tc.arguments },
+        })) : []),
+        ...(m.toolCallId ? [{
+          toolResult: { toolUseId: m.toolCallId, content: [{ text: m.content }] },
+        }] : []),
+      ],
+    }));
+
     const body = JSON.stringify({
-      messages: nonSystem.map(m => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: [{ text: m.content }],
-      })),
+      messages: bodyContent,
       ...(systemMsg ? { system: [{ text: systemMsg.content }] } : {}),
       inferenceConfig: { maxTokens: 8192 },
+      ...(opts.tools && opts.tools.length > 0 ? {
+        toolConfig: { tools: opts.tools.map((t: any) => ({
+          toolSpec: { name: t.function?.name ?? t.name ?? "", description: t.function?.description ?? "", inputSchema: { json: t.function?.parameters ?? t.inputSchema ?? {} } },
+        })) },
+      } : {}),
     });
 
     const bodyHash = sha256(body);
@@ -65,7 +80,7 @@ export class BedrockProvider implements Provider {
 
     const canonicalUri = `/model/${encodeURIComponent(modelId)}/converse-stream`;
     const canonicalQuery = "";
-    const headers = {
+    const headers: Record<string, string> = {
       host,
       "x-amz-date": amzDate,
       "x-amz-content-sha256": bodyHash,
@@ -108,12 +123,12 @@ export class BedrockProvider implements Provider {
 
       if (!resp.ok) {
         const err = await resp.text().catch(() => "");
-        yield `Error ${resp.status}: ${err}`;
+        yield { type: "error" as const, message: `Error ${resp.status}: ${err}` };
         return;
       }
 
       const reader = resp.body?.getReader();
-      if (!reader) { yield "Error: No response body"; return; }
+      if (!reader) { yield { type: "error" as const, message: "No response body" }; return; }
 
       const decoder = new TextDecoder();
       let buffer = "";
@@ -132,21 +147,33 @@ export class BedrockProvider implements Provider {
 
           try {
             const parsed = JSON.parse(trimmed);
-            const text = parsed.contentBlockDelta?.delta?.text;
-            if (text) yield text;
+
+            if (parsed.contentBlockDelta?.delta?.text) {
+              yield { type: "text" as const, content: parsed.contentBlockDelta.delta.text };
+            }
+
+            if (parsed.contentBlockStart?.start?.toolUse) {
+              const tu = parsed.contentBlockStart.start.toolUse;
+              yield { type: "tool_call_start" as const, id: tu.toolUseId, name: tu.name };
+            }
+
+            if (parsed.contentBlockDelta?.delta?.toolUse?.input) {
+              const input = parsed.contentBlockDelta.delta.toolUse.input;
+              yield { type: "tool_call_delta" as const, id: "bedrock_1", delta: JSON.stringify(input) };
+            }
           } catch {
             const match = trimmed.match(/{[^}]*"text"[^}]*}/);
             if (match) {
               try {
                 const parsed = JSON.parse(match[0]);
-                if (parsed.text) yield parsed.text;
+                if (parsed.text) yield { type: "text" as const, content: parsed.text };
               } catch {}
             }
           }
         }
       }
     } catch (err: any) {
-      yield `Bedrock error: ${err?.message ?? "Connection failed"}`;
+      yield { type: "error" as const, message: `Bedrock error: ${err?.message ?? "Connection failed"}` };
     }
   }
 

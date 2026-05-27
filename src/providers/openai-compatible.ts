@@ -1,4 +1,4 @@
-import type { Provider, ChatMessage, ChatOptions, ProviderConfig } from "./interface.js";
+import type { Provider, ChatMessage, ChatOptions, ProviderConfig, StreamEvent } from "./interface.js";
 
 export class OpenAICompatibleProvider implements Provider {
   id: string;
@@ -19,7 +19,7 @@ export class OpenAICompatibleProvider implements Provider {
 
   async *chat(messages: ChatMessage[], opts: ChatOptions) {
     if (!this.apiKey && this.config.apiKeyEnv) {
-      yield `Error: ${this.config.apiKeyEnv} not configured.`;
+      yield { type: "error" as const, message: `${this.config.apiKeyEnv} not configured.` };
       return;
     }
 
@@ -27,7 +27,16 @@ export class OpenAICompatibleProvider implements Provider {
 
     const body: Record<string, any> = {
       model: opts.model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
+        ...(m.toolCalls ? { tool_calls: m.toolCalls.map(tc => ({
+          id: tc.id ?? "",
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })) } : {}),
+      })),
       stream: true,
       max_tokens: opts.model.includes("grok") ? undefined : 8192,
     };
@@ -54,12 +63,12 @@ export class OpenAICompatibleProvider implements Provider {
 
     if (!resp.ok) {
       const err = await resp.text().catch(() => "");
-      yield `Error ${resp.status}: ${err}`;
+      yield { type: "error" as const, message: `Error ${resp.status}: ${err}` };
       return;
     }
 
     const reader = resp.body?.getReader();
-    if (!reader) { yield "Error: No body"; return; }
+    if (!reader) { yield { type: "error" as const, message: "No body" }; return; }
 
     const decoder = new TextDecoder();
     let buffer = "";
@@ -78,8 +87,23 @@ export class OpenAICompatibleProvider implements Provider {
           if (data === "[DONE]") return;
           try {
             const json = JSON.parse(data);
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) yield delta;
+            const choice = json.choices?.[0];
+            if (!choice) continue;
+
+            const content = choice.delta?.content;
+            if (content) yield { type: "text" as const, content };
+
+            const toolCalls = choice.delta?.tool_calls;
+            if (toolCalls) {
+              for (const tc of toolCalls) {
+                if (tc.id) {
+                  yield { type: "tool_call_start" as const, id: tc.id, name: tc.function?.name ?? "" };
+                }
+                if (tc.function?.arguments) {
+                  yield { type: "tool_call_delta" as const, id: tc.id ?? tc.index?.toString() ?? "", delta: tc.function.arguments };
+                }
+              }
+            }
           } catch { }
         }
       }

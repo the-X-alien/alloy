@@ -16,7 +16,7 @@ import { ContextBankDialog } from "./dialogs/context-bank.js";
 import { MemoryBrowserDialog } from "./dialogs/memory-browser.js";
 import { PlanViewerDialog } from "./dialogs/plan-viewer.js";
 import { getModels, getProviderConfig, getModelCost, getProviderConfigs } from "../providers/registry.js";
-import type { ChatMessage, Provider } from "../providers/interface.js";
+import type { ChatMessage, Provider, StreamEvent } from "../providers/interface.js";
 import { OpenAIProvider } from "../providers/openai.js";
 import { AnthropicProvider } from "../providers/anthropic.js";
 import { OpenAICompatibleProvider } from "../providers/openai-compatible.js";
@@ -32,8 +32,10 @@ import { MemoryManager } from "../memory/manager.js";
 import { ContextBankManager } from "../context-bank/manager.js";
 import { ContextInjector } from "../context-bank/injector.js";
 import { ModelRouter } from "../provider/router.js";
+import { runConversation } from "../agent/conversation-loop.js";
 import { Orchestrator } from "../agent/orchestrator.js";
 import { AgentRegistry } from "../agent/registry.js";
+import { AgentMode } from "../types.js";
 import { ToolRegistry } from "../agent/tool-registry.js";
 import { ToolExecutor } from "../agent/tool-executor.js";
 import { registerDefaultTools } from "../agent/tools/index.js";
@@ -277,11 +279,6 @@ export function App({ configLoader }: AppProps) {
       return;
     }
 
-    const userMsg: ChatMessage = { role: "user", content: text, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
-    setStreaming(true);
-    setStreamContent("");
-
     const prov = providerInst ?? createProvider(selected.provider);
     if (!prov) {
       setStreamContent("No provider available. Use Ctrl+P to add one.");
@@ -290,46 +287,41 @@ export function App({ configLoader }: AppProps) {
     }
 
     if (!prov.configured) {
-      const cfg = getProviderConfig(selected.provider);
       setStreamContent(`${prov.name} not configured. Use Ctrl+P to add API key.`);
       setStreaming(false);
       return;
     }
 
+    setStreaming(true);
+    setStreamContent("");
+
     try {
-      const allMsgs = [...messages, userMsg];
-      let fullResponse = "";
+      const result = await runConversation(
+        text,
+        messages,
+        {
+          mode: AgentMode.Chat as any,
+          model: selected.model,
+          provider: selected.provider,
+        },
+        {
+          provider: prov,
+          memoryManager,
+          skillManager: skills,
+          contextInjector,
+          costGovernor: governor,
+          modelRouter,
+          toolExecutor,
+        },
+        (token: string) => {
+          setStreamContent(prev => prev + token);
+        },
+      );
 
-      const routedModel = modelRouter.route(text, governor.getRemaining());
-
-      for await (const token of prov.chat(allMsgs, { model: routedModel })) {
-        fullResponse += token;
-        setStreamContent(fullResponse);
+      if (result.totalCost > 0) {
+        sessions.update({ estimatedCost: (sessions.current?.estimatedCost ?? 0) + result.totalCost });
       }
-
-      const inputTokens = Math.ceil(text.length / 4);
-      const outputTokens = Math.ceil(fullResponse.length / 4);
-      const costData = getModelCost(selected.provider, selected.model);
-      let cost = -1;
-      if (costData) {
-        cost = governor.estimateAndRecord(
-          selected.provider, selected.model, inputTokens, outputTokens,
-          () => (inputTokens / 1_000_000 * costData.input) + (outputTokens / 1_000_000 * costData.output)
-        );
-      }
-
-      const assistantMsg: ChatMessage = {
-        role: "assistant",
-        content: fullResponse,
-        model: `${selected.provider}/${routedModel}`,
-        cost: cost > 0 ? cost : 0,
-        timestamp: Date.now(),
-      };
-
-      if (cost > 0) sessions.update({ estimatedCost: (sessions.current?.estimatedCost ?? 0) + cost });
-      setMessages(prev => [...prev, assistantMsg]);
-
-      memoryManager.syncTurn(text, fullResponse);
+      setMessages(result.messages);
     } catch (err: any) {
       setStreamContent(`Error: ${err?.message ?? "Unknown error"}`);
     } finally {

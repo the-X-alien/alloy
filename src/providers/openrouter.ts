@@ -1,18 +1,4 @@
-import type { Provider, ChatMessage, ChatOptions, ProviderConfig } from "./interface.js";
-
-interface OpenRouterResponse {
-  id: string;
-  choices: {
-    index: number;
-    delta: { content?: string; reasoning?: string };
-    finish_reason: string | null;
-  }[];
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+import type { Provider, ChatMessage, ChatOptions, ProviderConfig, StreamEvent } from "./interface.js";
 
 export class OpenRouterProvider implements Provider {
   id = "openrouter";
@@ -28,7 +14,7 @@ export class OpenRouterProvider implements Provider {
 
   async *chat(messages: ChatMessage[], opts: ChatOptions) {
     if (!this.apiKey) {
-      yield "Error: OPENROUTER_API_KEY not configured.";
+      yield { type: "error" as const, message: "OPENROUTER_API_KEY not configured." };
       return;
     }
 
@@ -36,7 +22,16 @@ export class OpenRouterProvider implements Provider {
 
     const body: Record<string, any> = {
       model: opts.model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
+        ...(m.toolCalls ? { tool_calls: m.toolCalls.map(tc => ({
+          id: tc.id ?? "",
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })) } : {}),
+      })),
       stream: true,
       max_tokens: opts.model.includes("grok") ? undefined : 8192,
       include_reasoning: true,
@@ -59,12 +54,12 @@ export class OpenRouterProvider implements Provider {
 
     if (!resp.ok) {
       const err = await resp.text().catch(() => "");
-      yield `Error ${resp.status}: ${err}`;
+      yield { type: "error" as const, message: `Error ${resp.status}: ${err}` };
       return;
     }
 
     const reader = resp.body?.getReader();
-    if (!reader) { yield "Error: No body"; return; }
+    if (!reader) { yield { type: "error" as const, message: "No body" }; return; }
 
     const decoder = new TextDecoder();
     let buffer = "";
@@ -82,9 +77,28 @@ export class OpenRouterProvider implements Provider {
           const data = line.slice(6).trim();
           if (data === "[DONE]") return;
           try {
-            const json: OpenRouterResponse = JSON.parse(data);
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) yield delta;
+            const json = JSON.parse(data);
+            const choice = json.choices?.[0];
+            if (!choice) continue;
+
+            const content = choice.delta?.content;
+            if (content) yield { type: "text" as const, content };
+
+            if (choice.delta?.reasoning) {
+              yield { type: "reasoning" as const, content: choice.delta.reasoning };
+            }
+
+            const toolCalls = choice.delta?.tool_calls;
+            if (toolCalls) {
+              for (const tc of toolCalls) {
+                if (tc.id) {
+                  yield { type: "tool_call_start" as const, id: tc.id, name: tc.function?.name ?? "" };
+                }
+                if (tc.function?.arguments) {
+                  yield { type: "tool_call_delta" as const, id: tc.id ?? tc.index?.toString() ?? "", delta: tc.function.arguments };
+                }
+              }
+            }
           } catch { }
         }
       }

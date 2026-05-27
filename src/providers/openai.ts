@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { Provider, ChatMessage, ChatOptions, ProviderConfig } from "./interface.js";
+import type { Provider, ChatMessage, ChatOptions, ProviderConfig, StreamEvent } from "./interface.js";
 
 export class OpenAIProvider implements Provider {
   id: string;
@@ -24,20 +24,44 @@ export class OpenAIProvider implements Provider {
 
   async *chat(messages: ChatMessage[], opts: ChatOptions) {
     if (!this.client) {
-      yield "Error: OpenAI API key not configured. Set OPENAI_API_KEY.";
+      yield { type: "error" as const, message: "OpenAI API key not configured. Set OPENAI_API_KEY." };
       return;
     }
 
     const stream = await this.client.chat.completions.create({
       model: opts.model,
-      messages: messages.map(m => ({ role: m.role as "user" | "assistant" | "system" | "tool", content: m.content })),
+      messages: messages.map(m => ({
+        role: m.role as "user" | "assistant" | "system" | "tool",
+        content: m.content,
+        ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
+        ...(m.toolCalls ? { tool_calls: m.toolCalls.map(tc => ({
+          id: tc.id ?? "",
+          type: "function" as const,
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })) } : {}),
+      })),
       stream: true,
       ...(opts.tools ? { tools: opts.tools } : {}),
     });
 
     for await (const chunk of stream) {
-      const delta = chunk.choices?.[0]?.delta?.content;
-      if (delta) yield delta;
+      const choice = chunk.choices?.[0];
+      if (!choice) continue;
+
+      const content = choice.delta?.content;
+      if (content) yield { type: "text" as const, content };
+
+      const toolCalls = choice.delta?.tool_calls;
+      if (toolCalls) {
+        for (const tc of toolCalls) {
+          if (tc.id) {
+            yield { type: "tool_call_start" as const, id: tc.id, name: tc.function?.name ?? "" };
+          }
+          if (tc.function?.arguments) {
+            yield { type: "tool_call_delta" as const, id: tc.id ?? tc.index?.toString() ?? "", delta: tc.function.arguments };
+          }
+        }
+      }
     }
   }
 

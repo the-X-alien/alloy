@@ -1,5 +1,4 @@
-import type { ChatMessage } from "../providers/interface.js";
-import type { Provider } from "../providers/interface.js";
+import type { ChatMessage, StreamEvent, Provider } from "../providers/interface.js";
 import type { AgentConfig, AgentResult } from "./types.js";
 import { ToolExecutor } from "./tool-executor.js";
 import type { MemoryManager } from "../memory/manager.js";
@@ -19,6 +18,12 @@ export interface LoopConfig {
   costGovernor: CostGovernor;
   modelRouter?: ModelRouter;
   toolExecutor: ToolExecutor;
+}
+
+interface PartialToolCall {
+  id: string;
+  name: string;
+  argsBuffer: string;
 }
 
 export async function runConversation(
@@ -73,6 +78,8 @@ export async function runConversation(
   let totalOutputTokens = 0;
   let totalCost = 0;
 
+  let partialToolCalls = new Map<string, PartialToolCall>();
+
   while (turnCount < maxTurns) {
     turnCount++;
 
@@ -89,63 +96,87 @@ export async function runConversation(
     }));
 
     let response = "";
-    let toolCalls: any[] = [];
+    let turnToolCalls: { id: string; name: string; arguments: Record<string, unknown> }[] = [];
 
-    for await (const chunk of provider.chat(allMessages, {
+    partialToolCalls.clear();
+
+    for await (const event of provider.chat(allMessages, {
       model: model as string,
       tools: useTools ? openAITools : undefined,
     })) {
-      response += chunk;
-      onToken(chunk);
+      switch (event.type) {
+        case "text":
+          response += event.content;
+          onToken(event.content);
+          break;
+
+        case "reasoning":
+          onToken(event.content);
+          break;
+
+        case "tool_call_start":
+          partialToolCalls.set(event.id, { id: event.id, name: event.name, argsBuffer: "" });
+          break;
+
+        case "tool_call_delta":
+          {
+            const existing = partialToolCalls.get(event.id);
+            if (existing) {
+              existing.argsBuffer += event.delta;
+            }
+          }
+          break;
+
+        case "tool_call_end":
+          {
+            const tc = partialToolCalls.get(event.id);
+            if (tc) {
+              let parsed: Record<string, unknown> = {};
+              try {
+                parsed = JSON.parse(tc.argsBuffer);
+              } catch {
+                parsed = { _raw: tc.argsBuffer };
+              }
+              turnToolCalls.push({ id: tc.id, name: tc.name, arguments: parsed });
+              partialToolCalls.delete(event.id);
+            }
+          }
+          break;
+
+        case "error":
+          response += `\n[Error: ${event.message}]`;
+          onToken(`\n[Error: ${event.message}]`);
+          break;
+      }
     }
 
     fullOutput += response;
 
-    const parsedResponse = tryParseResponse(response);
-
-    if (parsedResponse?.toolCalls && parsedResponse.toolCalls.length > 0) {
-      toolCalls = parsedResponse.toolCalls;
-    }
-
-    if (toolCalls.length === 0) break;
+    if (turnToolCalls.length === 0) break;
 
     const assistantMsg: ChatMessage = {
       role: "assistant",
       content: response,
-      toolCalls,
+      toolCalls: turnToolCalls,
       timestamp: Date.now(),
       model: model as string,
     };
     allMessages.push(assistantMsg);
 
-    for (const tc of toolCalls) {
+    for (const tc of turnToolCalls) {
       let result: string;
 
-      if (pluginRuntime) {
-        const hookResult = await pluginRuntime.hookManager.fire("tool.execute.before", {
-          toolName: tc.name,
-          args: tc.arguments,
-        });
-        if ((hookResult as any)?.abort) {
-          result = (hookResult as any).result ?? "Aborted by plugin";
-          continue;
-        }
-      }
-
-      result = await toolExecutor.execute(tc);
-
-      if (pluginRuntime) {
-        result = await pluginRuntime.hookManager.fire("tool.execute.after", {
-          toolName: tc.name,
-          args: tc.arguments,
-          result,
-        }) as string;
-      }
+      result = await toolExecutor.execute({
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+      });
 
       const toolMsg: ChatMessage = {
         role: "tool",
         content: result,
         toolName: tc.name,
+        toolCallId: tc.id,
         timestamp: Date.now(),
       };
       allMessages.push(toolMsg);
@@ -179,19 +210,6 @@ export async function runConversation(
   };
 
   return result;
-}
-
-function tryParseResponse(response: string): { content?: string; toolCalls?: any[] } | null {
-  try {
-    const parsed = JSON.parse(response);
-    if (parsed.tool_calls || parsed.toolCalls) {
-      return {
-        content: parsed.content,
-        toolCalls: parsed.tool_calls ?? parsed.toolCalls,
-      };
-    }
-  } catch { }
-  return null;
 }
 
 function estimateTokens(text: string): number {

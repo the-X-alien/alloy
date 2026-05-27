@@ -1,4 +1,4 @@
-import type { Provider, ChatMessage, ChatOptions, ProviderConfig } from "./interface.js";
+import type { Provider, ChatMessage, ChatOptions, ProviderConfig, StreamEvent } from "./interface.js";
 
 export class GoogleProvider implements Provider {
   id: string;
@@ -17,7 +17,7 @@ export class GoogleProvider implements Provider {
 
   async *chat(messages: ChatMessage[], opts: ChatOptions) {
     if (!this.apiKey) {
-      yield "Error: Gemini API key not configured. Set GEMINI_API_KEY.";
+      yield { type: "error" as const, message: "Gemini API key not configured. Set GEMINI_API_KEY." };
       return;
     }
 
@@ -26,8 +26,16 @@ export class GoogleProvider implements Provider {
     const contents = messages
       .filter(m => m.role !== "system")
       .map(m => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
+        role: m.role === "assistant" ? "model" as const : "user" as const,
+        parts: [
+          ...(m.content ? [{ text: m.content }] : []),
+          ...(m.toolCalls ? m.toolCalls.map(tc => ({
+            functionCall: { name: tc.name, args: tc.arguments },
+          })) : []),
+          ...(m.toolCallId ? [{
+            functionResponse: { name: "tool", response: { name: "tool", content: m.content } },
+          }] : []),
+        ],
       }));
 
     const body: Record<string, unknown> = {
@@ -40,6 +48,16 @@ export class GoogleProvider implements Provider {
       body.systemInstruction = { parts: [{ text: systemMsg.content }] };
     }
 
+    if (opts.tools && opts.tools.length > 0) {
+      body.tools = [{
+        functionDeclarations: opts.tools.map((t: any) => ({
+          name: t.function?.name ?? t.name ?? "unknown",
+          description: t.function?.description ?? "",
+          parameters: t.function?.parameters ?? t.inputSchema ?? {},
+        })),
+      }];
+    }
+
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,13 +66,13 @@ export class GoogleProvider implements Provider {
 
     if (!resp.ok) {
       const err = await resp.text().catch(() => "");
-      yield `Error ${resp.status}: ${err}`;
+      yield { type: "error" as const, message: `Error ${resp.status}: ${err}` };
       return;
     }
 
     const reader = resp.body?.getReader();
     if (!reader) {
-      yield "Error: No response body";
+      yield { type: "error" as const, message: "No response body" };
       return;
     }
 
@@ -73,8 +91,21 @@ export class GoogleProvider implements Provider {
         if (line.startsWith("data: ")) {
           try {
             const json = JSON.parse(line.slice(6));
-            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) yield text;
+            const parts = json.candidates?.[0]?.content?.parts;
+            if (!parts) continue;
+
+            for (const part of parts) {
+              if (part.text) {
+                yield { type: "text" as const, content: part.text };
+              }
+              if (part.functionCall) {
+                const fc = part.functionCall;
+                yield { type: "tool_call_start" as const, id: fc.name ?? "fc_1", name: fc.name ?? "" };
+                if (fc.args) {
+                  yield { type: "tool_call_delta" as const, id: fc.name ?? "fc_1", delta: JSON.stringify(fc.args) };
+                }
+              }
+            }
           } catch { }
         }
       }
