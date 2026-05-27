@@ -31,7 +31,7 @@ export function SettingsDialog({ provider, model, messages, spent, budget, onClo
       <Text bold color={COLORS.accent}>{"Settings"}</Text>
       <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
 
-      <Text bold color={COLORS.textBright}>{"Active Model"}</Text>
+      <Text bold color={COLORS.text}>{"Active Model"}</Text>
       <Text color={COLORS.text}>
         {"  "}
         <Text color={pColor}>{provider}</Text>
@@ -40,7 +40,7 @@ export function SettingsDialog({ provider, model, messages, spent, budget, onClo
       </Text>
       <Box height={1} />
 
-      <Text bold color={COLORS.textBright}>{"Configured Providers"}</Text>
+      <Text bold color={COLORS.text}>{"Configured Providers"}</Text>
       {configured.length === 0 ? (
         <Text color={COLORS.warning}>{"  None configured"}</Text>
       ) : (
@@ -54,7 +54,7 @@ export function SettingsDialog({ provider, model, messages, spent, budget, onClo
       )}
       <Box height={1} />
 
-      <Text bold color={COLORS.textBright}>{"Session"}</Text>
+      <Text bold color={COLORS.text}>{"Session"}</Text>
       <Text color={COLORS.text}>{`  Messages: ${messages}`}</Text>
       <Text color={COLORS.text}>{`  Cost spent: ${formatCost(spent)}`}</Text>
       <Text color={COLORS.text}>{`  Budget remaining: `}
@@ -65,7 +65,7 @@ export function SettingsDialog({ provider, model, messages, spent, budget, onClo
       </Text>
       <Box height={1} />
 
-      <Text bold color={COLORS.textBright}>{"Version"}</Text>
+      <Text bold color={COLORS.text}>{"Version"}</Text>
       <Text color={COLORS.textDim}>{"  alloy-cli v0.1.0"}</Text>
       <Text color={COLORS.textDim}>{"  github.com/the-X-alien/alloy"}</Text>
 

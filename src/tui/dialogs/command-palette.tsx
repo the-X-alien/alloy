@@ -41,7 +41,7 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
 
   return (
     <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={COLORS.accent} padding={1}>
-      <Box borderStyle="single" borderColor={COLORS.border} paddingX={1}>
+      <Box borderStyle="single" borderColor={COLORS.borderActive} paddingX={1}>
         <Text>{"> "}{query}<Text color={COLORS.accent}>{"\u258C"}</Text></Text>
       </Box>
       <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
@@ -55,7 +55,7 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
                 {i === cursor ? "\u25B6 " : "  "}
                 <Text color={COLORS.textDim}>{cmd.category}</Text>
                 {" / "}
-                <Text color={i === cursor ? COLORS.textBright : COLORS.text}>{cmd.title}</Text>
+                <Text color={i === cursor ? COLORS.accent : COLORS.text}>{cmd.title}</Text>
               </Text>
             </Box>
           ))

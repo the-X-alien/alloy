@@ -1,108 +1,49 @@
 #!/usr/bin/env node
-import { StrictMode } from "react";
+import React from "react";
 import { render } from "ink";
 import { App } from "./tui/app.js";
-import { trySetStuckKey } from "./tui/onboarding/index.js";
-import { getProviderConfigs } from "./providers/registry.js";
-import { detectTools, importFrom, importAll, applyImport } from "./migrate/importer.js";
-import { uninstall } from "./uninstall.js";
+import { initConfig } from "./config/loader.js";
+import { migrateConfig } from "./config/migrate.js";
 
 const args = process.argv.slice(2);
 
-async function main() {
-  if (args.includes("--uninstall") || args.includes("uninstall")) {
-    const msgs = uninstall();
-    for (const m of msgs) console.log(m);
-    process.exit(0);
-  }
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`Alloy - Multi-model AI coding agent
+Usage: alloy [options]
 
-  if (args.includes("--import") || args.includes("import")) {
-    const idx = args.indexOf("--import") !== -1 ? args.indexOf("--import") : args.indexOf("import");
-    const target = args[idx + 1];
-    if (target) {
-      if (target === "all") {
-        const results = importAll();
-        for (const r of results) {
-          console.log(`\nImporting from ${r.source}...`);
-          const msgs = applyImport(r);
-          for (const m of msgs) console.log(`  ${m}`);
-        }
-      } else {
-        const result = importFrom(target as any);
-        console.log(`\nImporting from ${target}...`);
-        const msgs = applyImport(result);
-        for (const m of msgs) console.log(`  ${m}`);
-      }
-    } else {
-      console.log("Detected tools:");
-      const detected = detectTools();
-      for (const d of detected) {
-        console.log(`  ${d.tool}: ${d.detected ? "detected" : "not found"}`);
-      }
-    }
-    process.exit(0);
-  }
-
-  if (args.includes("--help") || args.includes("-h") || args.includes("help")) {
-    console.log(`
-Alloy - Multi-model AI coding agent
-
-Usage:
-  alloy            Start interactive TUI
-  alloy --help     Show this help
-  alloy --import   Import configs from other tools
-  alloy --uninstall Remove Alloy
-
-Commands (inside TUI):
-  /help            Show commands
-  /model <name>    Switch model
-  /provider <name> Switch provider
-  /clear           Clear conversation
-  /new             New session
-  /status          Show session status
-  /exit            Quit
-  /uninstall       Remove Alloy
-
-Providers:
-  Set any of these env vars:
-  OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY
-  DEEPSEEK_API_KEY, GROQ_API_KEY, XAI_API_KEY
-  (and 12+ more — see docs)
-
-Config:
-  ~/.alloy/        User config directory
-  ~/.alloy/skills/ Skill plugins
-`);
-    process.exit(0);
-  }
-
-  const configs = getProviderConfigs();
-  const hasAnyKey = configs.some(c => !!process.env[c.apiKeyEnv]);
-
-  if (!hasAnyKey) {
-    trySetStuckKey("stuck");
-  }
-
-  const { waitUntilExit, clear } = render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  );
-
-  process.on("SIGINT", () => {
-    try { clear(); } catch {}
-    process.exit(0);
-  });
-
-  process.on("SIGTERM", () => {
-    try { clear(); } catch {}
-    process.exit(0);
-  });
-
-  await waitUntilExit();
+Options:
+  --model <name>       Start with a specific model
+  --continue           Resume last session
+  --plan "<goal>"      Start in plan mode
+  --session <id>       Resume a specific session
+  --import <tool>      Import config from another tool
+  --help               Show this help
+  --version            Show version`);
+  process.exit(0);
 }
 
-main().catch(err => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+if (args.includes("--version") || args.includes("-v")) {
+  console.log("Alloy v0.1.0");
+  process.exit(0);
+}
+
+if (args.includes("--import") && args[args.indexOf("--import") + 1]) {
+  const source = args[args.indexOf("--import") + 1] as "claude" | "opencode" | "openclaw";
+  const { importFrom, applyImport } = await import("./migrate/importer.js");
+  const result = importFrom(source);
+  const msgs = applyImport(result);
+  for (const m of msgs) console.log(m);
+  process.exit(0);
+}
+
+migrateConfig();
+const configLoader = initConfig();
+
+const { waitUntilExit } = render(
+  React.createElement(App, { configLoader })
+);
+
+process.on("SIGINT", () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));
+
+await waitUntilExit();

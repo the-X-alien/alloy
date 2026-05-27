@@ -37,6 +37,7 @@ export class AnthropicProvider implements Provider {
       messages: nonSystem,
       max_tokens: 8192,
       stream: true,
+      ...(opts.tools ? { tools: opts.tools as any[] } : {}),
     });
 
     for await (const event of stream) {

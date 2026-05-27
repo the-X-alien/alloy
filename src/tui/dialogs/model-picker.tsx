@@ -48,7 +48,7 @@ export function ModelPicker({ models, currentModel, currentProvider, onSelect, o
                 {active ? "\u25C9 " : "\u25CB "}
                 <Text color={pColor}>{m.providerId}</Text>
                 <Text color={COLORS.textDim}>/</Text>
-                <Text color={i === cursor ? COLORS.textBright : COLORS.text}>{m.modelId}</Text>
+                <Text color={i === cursor ? COLORS.accent : COLORS.text}>{m.modelId}</Text>
                 {active && <Text color={COLORS.success}>{" (active)"}</Text>}
               </Text>
             </Box>

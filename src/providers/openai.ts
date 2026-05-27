@@ -30,8 +30,9 @@ export class OpenAIProvider implements Provider {
 
     const stream = await this.client.chat.completions.create({
       model: opts.model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: messages.map(m => ({ role: m.role as "user" | "assistant" | "system" | "tool", content: m.content })),
       stream: true,
+      ...(opts.tools ? { tools: opts.tools } : {}),
     });
 
     for await (const chunk of stream) {

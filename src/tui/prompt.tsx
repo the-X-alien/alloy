@@ -8,33 +8,27 @@ interface PromptProps {
   placeholder?: string;
 }
 
-export function PromptDisplay({ input, streaming, placeholder = "Type /help for commands..." }: PromptProps) {
+export function PromptDisplay({ input, streaming, placeholder = "Ask anything..." }: PromptProps) {
   const showSlash = input.startsWith("/");
-  const showText = input.length > 0;
 
   return (
-    <Box
-      borderStyle="single"
-      borderColor={streaming ? COLORS.accentDim : showSlash ? COLORS.accent : showText ? COLORS.surfaceLighter : COLORS.border}
-      paddingX={1}
-      flexShrink={0}
-    >
-      <Box>
-        <Text>
-          <Text color={streaming ? COLORS.accentDim : showSlash ? COLORS.accent : COLORS.success}>
-            {streaming ? " * " : showSlash ? " / " : " > "}
-          </Text>
-          {streaming ? (
-            <Text color={COLORS.accentDim}>{"Generating..."}</Text>
-          ) : (
-            <>
-              <Text color={COLORS.text}>
-                {input || <Text color={COLORS.textDim}>{placeholder}</Text>}
-              </Text>
-              <Text color={COLORS.accent} underline={false}>{"\u258C"}</Text>
-            </>
-          )}
+    <Box width="100%" flexDirection="row" flexShrink={0}>
+      <Box marginRight={1} flexShrink={0}>
+        <Text bold color={streaming ? COLORS.primaryDim : showSlash ? COLORS.accent : COLORS.primary}>
+          {streaming ? "\u25CF" : showSlash ? "\u002F" : "\u203A"}
         </Text>
+      </Box>
+      <Box flexGrow={1}>
+        {streaming ? (
+          <Text color={COLORS.primaryDim}>generating...</Text>
+        ) : (
+          <>
+            <Text color={COLORS.text}>
+              {input || <Text color={COLORS.textMuted}>{placeholder}</Text>}
+            </Text>
+            <Text color={COLORS.primary}>{"\u258C"}</Text>
+          </>
+        )}
       </Box>
     </Box>
   );

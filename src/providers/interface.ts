@@ -21,6 +21,8 @@ export interface ChatMessage {
   model?: string;
   cost?: number;
   timestamp: number;
+  toolCalls?: { id?: string; name: string; arguments: Record<string, unknown> }[];
+  toolName?: string;
 }
 
 export interface ChatOptions {
@@ -28,6 +30,7 @@ export interface ChatOptions {
   system?: string;
   onToken?: (token: string) => void;
   signal?: AbortSignal;
+  tools?: Record<string, unknown>[];
 }
 
 export interface Provider {

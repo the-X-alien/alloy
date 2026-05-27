@@ -25,12 +25,16 @@ export class OpenAICompatibleProvider implements Provider {
 
     const url = `${this.baseUrl}/chat/completions`;
 
-    const body = {
+    const body: Record<string, any> = {
       model: opts.model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       stream: true,
       max_tokens: opts.model.includes("grok") ? undefined : 8192,
     };
+
+    if (opts.tools && opts.tools.length > 0) {
+      body.tools = opts.tools;
+    }
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",

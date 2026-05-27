@@ -91,7 +91,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       <Box flexDirection="column" flexGrow={1} alignItems="center" justifyContent="center" padding={2}>
         <Logo />
         <Box height={1} />
-        <Text bold color={COLORS.textBright}>{"Welcome to Alloy"}</Text>
+        <Text bold color={COLORS.text}>{"Welcome to Alloy"}</Text>
         <Box height={1} />
         <Text color={COLORS.text}>{"Multi-model AI coding agent"}</Text>
         <Text color={COLORS.textDim}>{"Combine the best models. Avoid the rest."}</Text>

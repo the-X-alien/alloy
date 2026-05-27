@@ -2,54 +2,65 @@ import { Text, Box } from "ink";
 import React from "react";
 
 export const COLORS = {
-  accent: "#7C5CFC",
-  accentDim: "#5A3FB5",
-  accentBright: "#A78BFA",
-  success: "#34D399",
-  successDim: "#059669",
-  warning: "#FBBF24",
-  warningDim: "#D97706",
-  error: "#F87171",
-  errorDim: "#DC2626",
-  surface: "#0F111A",
-  surfaceLight: "#1E2030",
-  surfaceLighter: "#2A2D42",
-  border: "#3B3D5C",
-  borderLight: "#4A4D6E",
-  text: "#E2E8F0",
-  textDim: "#6B7280",
-  textBright: "#F8FAFC",
+  bg: "#0a0a0a",
+  bgPanel: "#141414",
+  bgElement: "#1e1e1e",
+  bgHover: "#282828",
+  border: "#484848",
+  borderActive: "#606060",
+  borderSubtle: "#3c3c3c",
+  text: "#eeeeee",
+  textMuted: "#808080",
+  textDim: "#606060",
+  primary: "#fab283",
+  primaryDim: "#d4915f",
+  secondary: "#5c9cf5",
+  secondaryDim: "#3a7ad8",
+  accent: "#9d7cd8",
+  accentDim: "#7a5cb8",
+  success: "#7fd88f",
+  successDim: "#5ab86a",
+  warning: "#f5a742",
+  warningDim: "#d4882e",
+  error: "#e06c75",
+  errorDim: "#c04a55",
+  info: "#56b6c2",
+  infoDim: "#3a94a0",
+  diffAdd: "#4fd6be",
+  diffRemove: "#c53b53",
+  diffAddDim: "#20303b",
+  diffRemoveDim: "#37222c",
   provider: {
-    openai: "#00A67E",
-    anthropic: "#D4A574",
-    google: "#4285F4",
-    deepseek: "#4F6BED",
+    openai: "#4fd6be",
+    anthropic: "#fab283",
+    google: "#5c9cf5",
+    deepseek: "#9d7cd8",
     xai: "#000000",
-    openrouter: "#FF6B6B",
-    groq: "#F97316",
-    ollama: "#FFFFFF",
-    default: "#7C5CFC",
+    openrouter: "#e06c75",
+    groq: "#f5a742",
+    ollama: "#ffffff",
+    default: "#808080",
   },
 };
 
 export const LOGO_ASCII = [
-  "    _    _ _                 ",
-  "   / \\  | | | ___  _   _    ",
-  "  / _ \\ | | |/ _ \\| | | |   ",
-  " / ___ \\| | | (_) | |_| |   ",
-  "/_/   \\_\\_|_|\\___/ \\__, |   ",
-  "                    |___/    ",
-  "  multi-model AI coding agent",
+  "░▒▓██████▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░",
+  "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░",
+  "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░",
+  "░▒▓████████▓▒░▒▓█▓▒░      ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░",
+  "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░  ░▒▓█▓▒░",
+  "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░  ░▒▓█▓▒░",
+  "░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░▒▓██████▓▒░   ░▒▓█▓▒░",
 ];
 
 const LOGO_COLORS = [
+  COLORS.primary,
+  COLORS.primaryDim,
+  COLORS.primaryDim,
+  COLORS.secondary,
   COLORS.accent,
-  COLORS.accentDim,
-  COLORS.accentBright,
-  COLORS.success,
-  COLORS.warning,
-  COLORS.error,
-  COLORS.textDim,
+  COLORS.accent,
+  COLORS.textMuted,
 ];
 
 export function Logo() {
@@ -57,25 +68,12 @@ export function Logo() {
     <Box flexDirection="column">
       {LOGO_ASCII.slice(0, 6).map((line, i) => (
         <Box key={`logo-${i}`}>
-          <Text color={LOGO_COLORS[i]} bold>{line}</Text>
+          <Text color={LOGO_COLORS[i]}>{line}</Text>
         </Box>
       ))}
       <Box marginTop={0}>
-        <Text color={COLORS.textDim}>{LOGO_ASCII[6]}</Text>
+        <Text color={COLORS.textMuted}>{LOGO_ASCII[6]}</Text>
       </Box>
-    </Box>
-  );
-}
-
-export function MiniLogo() {
-  return (
-    <Box>
-      <Text bold color={COLORS.accent}>{"a"}</Text>
-      <Text bold color={COLORS.accentDim}>{"l"}</Text>
-      <Text bold color={COLORS.accentBright}>{"l"}</Text>
-      <Text bold color={COLORS.success}>{"o"}</Text>
-      <Text bold color={COLORS.warning}>{"y"}</Text>
-      <Text color={COLORS.textDim}>{" v0.1.0"}</Text>
     </Box>
   );
 }

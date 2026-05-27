@@ -1,69 +1,80 @@
-export interface Session {
-  id: string;
-  title: string;
-  model: string;
-  provider: string;
-  createdAt: number;
-  updatedAt: number;
-  totalCost: number;
-  messageCount: number;
-}
+import { SessionStore } from "./store.js";
+import { SessionSearch } from "./search.js";
+import { ContextCompressor } from "./compression.js";
+import { createSnapshot } from "./snapshot.js";
+import type { SessionMeta, SessionStatus } from "./types.js";
+import type { ChatMessage } from "../providers/interface.js";
 
 export class SessionManager {
-  private sessions: Session[] = [];
+  private store = new SessionStore();
+  private search = new SessionSearch();
+  private compressor = new ContextCompressor();
   private currentId: string | null = null;
 
-  constructor() {
-    this.create("Welcome");
+  get current(): SessionMeta | null {
+    if (!this.currentId) return null;
+    return this.store.get(this.currentId);
   }
 
-  get all() { return this.sessions; }
-  get current() { return this.sessions.find(s => s.id === this.currentId) || null; }
+  get all(): SessionMeta[] {
+    return this.store.getAll();
+  }
 
-  create(title: string = "New Session"): Session {
-    const session: Session = {
-      id: crypto.randomUUID(),
-      title,
-      model: "claude-sonnet-4-20250514",
-      provider: "anthropic",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      totalCost: 0,
-      messageCount: 0,
-    };
-    this.sessions.push(session);
+  create(model: string, provider: string, title?: string): SessionMeta {
+    const session = this.store.create(model, provider, title);
     this.currentId = session.id;
     return session;
   }
 
-  switchTo(id: string) {
-    if (this.sessions.find(s => s.id === id)) {
+  switchTo(id: string): boolean {
+    const exists = this.store.get(id);
+    if (exists) {
       this.currentId = id;
+      return true;
     }
+    return false;
   }
 
-  delete(id: string) {
-    this.sessions = this.sessions.filter(s => s.id !== id);
+  delete(id: string): void {
+    this.store.delete(id);
     if (this.currentId === id) {
-      if (this.sessions.length > 0) {
-        this.currentId = this.sessions[this.sessions.length - 1].id;
-      } else {
-        this.currentId = this.create().id;
-      }
+      const all = this.store.getAll();
+      this.currentId = all.length > 0 ? all[0].id : null;
     }
   }
 
-  updateCurrent(updates: Partial<Session>) {
-    const s = this.current;
-    if (s) Object.assign(s, updates, { updatedAt: Date.now() });
+  addMessage(msg: ChatMessage): void {
+    if (!this.currentId) return;
+    this.store.addMessage(this.currentId, msg);
   }
 
-  addCost(amount: number) {
-    const s = this.current;
-    if (s) {
-      s.totalCost += amount;
-      s.messageCount += 1;
-      s.updatedAt = Date.now();
-    }
+  getMessages(): ChatMessage[] {
+    if (!this.currentId) return [];
+    return this.store.getMessages(this.currentId);
+  }
+
+  update(updates: Partial<SessionMeta>): void {
+    if (!this.currentId) return;
+    this.store.update(this.currentId, updates);
+  }
+
+  searchSessions(query: string): SessionMeta[] {
+    return this.store.search(query);
+  }
+
+  searchMessages(query: string) {
+    return this.search.search(query);
+  }
+
+  snapshot() {
+    if (!this.currentId) return null;
+    const session = this.current;
+    return createSnapshot(this.currentId, session?.messageCount ?? 0);
+  }
+
+  shouldCompact(threshold: number): boolean {
+    if (!this.currentId) return false;
+    const session = this.current;
+    return this.compressor.shouldCompact(session?.messageCount ?? 0, threshold);
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "alloy-cli",
   "version": "0.1.0",
-  "description": "Multi-model AI coding agent — combine the best, avoid the rest",
+  "description": "Multi-model AI coding agent — powered by OpenCode",
   "type": "module",
   "bin": {
     "alloy": "dist/cli.js"
@@ -28,6 +28,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "opencode": "opencode",
     "start": "alloy",
     "prepublishOnly": "npm run build",
     "link": "npm link"
@@ -35,6 +36,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@openrouter/ai-sdk-provider": "^2.9.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.10.0",
+    "glob": "^13.0.6",
     "ink": "^4.4.1",
     "openai": "^4.85.0",
     "picocolors": "^1.1.1",

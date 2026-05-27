@@ -42,6 +42,10 @@ export class OpenRouterProvider implements Provider {
       include_reasoning: true,
     };
 
+    if (opts.tools && opts.tools.length > 0) {
+      body.tools = opts.tools;
+    }
+
     const resp = await fetch(url, {
       method: "POST",
       headers: {

@@ -3,3 +3,8 @@ dist/
 *.log
 test-*.txt
 .DS_Store
+_claude-leak/
+_hermes/
+_opencode/
+_plugins/
+test-*

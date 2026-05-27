@@ -7,7 +7,7 @@ export function HelpDialog() {
     <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={COLORS.accent} padding={1}>
       <Text bold color={COLORS.accent}>{"Alloy Help"}</Text>
       <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
-      <Text bold color={COLORS.textBright}>{"Slash Commands"}</Text>
+      <Text bold color={COLORS.text}>{"Slash Commands"}</Text>
       <Text color={COLORS.text}>{"  /help         Show this help"}</Text>
       <Text color={COLORS.text}>{"  /models       List available models"}</Text>
       <Text color={COLORS.text}>{"  /providers    List configured providers"}</Text>
@@ -25,7 +25,7 @@ export function HelpDialog() {
       <Text color={COLORS.text}>{"  /exit         Quit Alloy"}</Text>
       <Text color={COLORS.text}>{"  /uninstall    Remove Alloy"}</Text>
       <Text color={COLORS.textDim}>{"\u2500".repeat(48)}</Text>
-      <Text bold color={COLORS.textBright}>{"Keyboard Shortcuts"}</Text>
+      <Text bold color={COLORS.text}>{"Keyboard Shortcuts"}</Text>
       <Text color={COLORS.text}>{"  Ctrl+K        Command palette"}</Text>
       <Text color={COLORS.text}>{"  Ctrl+M        Switch model"}</Text>
       <Text color={COLORS.text}>{"  Ctrl+P        Connect provider"}</Text>

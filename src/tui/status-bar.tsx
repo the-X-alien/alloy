@@ -12,43 +12,44 @@ interface StatusBarProps {
   messages: number;
 }
 
+function shortenModel(m: string): string {
+  const parts = m.split("/");
+  const name = parts[parts.length - 1] || m;
+  if (name.length <= 18) return name;
+  if (name.includes("-")) {
+    const segs = name.split("-");
+    return segs.slice(0, 3).join("-").slice(0, 20);
+  }
+  return name.slice(0, 18);
+}
+
 export function StatusBar({ session, provider, model, spent, budget, messages }: StatusBarProps) {
   const remaining = budget - spent;
   const costColor = remaining < 1 ? COLORS.error : remaining < 3 ? COLORS.warning : COLORS.success;
-  const pColor = providerColor(provider);
 
   return (
     <Box
-      borderStyle="single"
-      borderColor={COLORS.border}
+      backgroundColor={COLORS.bgPanel}
       paddingX={1}
-      justifyContent="space-between"
       width="100%"
       flexShrink={0}
+      minHeight={1}
     >
-      <Box gap={2}>
-        <Text color={COLORS.textDim}>
-          {"session: "}
-          <Text color={COLORS.textBright}>{session?.title ?? "default"}</Text>
-        </Text>
-        <Text color={COLORS.textDim}>
-          {"msgs: "}
-          <Text color={COLORS.text}>{String(messages)}</Text>
-        </Text>
-      </Box>
-      <Box gap={2}>
-        <Text color={COLORS.textDim}>
-          {"model: "}
-          <Text color={pColor}>{provider}</Text>
-          <Text color={COLORS.textDim}>/</Text>
-          <Text color={COLORS.text}>{model}</Text>
-        </Text>
-        <Text color={COLORS.textDim}>
-          {"cost: "}
-          <Text color={costColor}>{formatCost(spent)}</Text>
-          <Text color={COLORS.textDim}>{` / $${budget.toFixed(2)}`}</Text>
-        </Text>
-      </Box>
+      <Text>
+        <Text color={COLORS.textMuted}>{"session "}</Text>
+        <Text color={COLORS.text}>{session?.title ?? "default"}</Text>
+        <Text color={COLORS.borderSubtle}>{" | "}</Text>
+        <Text color={COLORS.textMuted}>{messages}</Text>
+        <Text color={COLORS.textMuted}>{" msg"}</Text>
+        <Text color={COLORS.borderSubtle}>{" | "}</Text>
+        <Text color={providerColor(provider)}>{provider}</Text>
+        <Text color={COLORS.textMuted}>/</Text>
+        <Text color={COLORS.text}>{shortenModel(model)}</Text>
+        <Text color={COLORS.borderSubtle}>{" | "}</Text>
+        <Text color={costColor}>{formatCost(spent)}</Text>
+        <Text color={COLORS.textMuted}>{"/"}</Text>
+        <Text color={COLORS.textDim}>{formatCost(budget)}</Text>
+      </Text>
     </Box>
   );
 }
