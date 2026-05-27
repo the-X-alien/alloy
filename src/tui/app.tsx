@@ -267,7 +267,12 @@ export function App({ configLoader }: AppProps) {
         timestamp: Date.now(),
       }]);
     } catch (err: any) {
-      setStreamContent(`Error: ${err?.message ?? "Unknown"}`);
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: `Error: ${err?.message ?? "Unknown"}`,
+        model: `${selected.provider}/${selected.model}`,
+        timestamp: Date.now(),
+      }]);
     } finally {
       setStreaming(false);
     }
@@ -323,7 +328,13 @@ export function App({ configLoader }: AppProps) {
       }
       setMessages(result.messages);
     } catch (err: any) {
-      setStreamContent(`Error: ${err?.message ?? "Unknown error"}`);
+      const errMsg = `Error: ${err?.message ?? "Unknown error"}`;
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: errMsg,
+        model: `${selected.provider}/${selected.model}`,
+        timestamp: Date.now(),
+      }]);
     } finally {
       setStreaming(false);
     }

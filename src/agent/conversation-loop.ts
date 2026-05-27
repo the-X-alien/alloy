@@ -106,12 +106,14 @@ export async function runConversation(
     })) {
       switch (event.type) {
         case "text":
-          response += event.content;
-          onToken(event.content);
+          if (event.content) {
+            response += event.content;
+            onToken(event.content);
+          }
           break;
 
         case "reasoning":
-          onToken(event.content);
+          if (event.content) onToken(event.content);
           break;
 
         case "tool_call_start":
@@ -152,16 +154,16 @@ export async function runConversation(
 
     fullOutput += response;
 
-    if (turnToolCalls.length === 0) break;
-
     const assistantMsg: ChatMessage = {
       role: "assistant",
       content: response,
-      toolCalls: turnToolCalls,
+      toolCalls: turnToolCalls.length > 0 ? turnToolCalls : undefined,
       timestamp: Date.now(),
       model: model as string,
     };
     allMessages.push(assistantMsg);
+
+    if (turnToolCalls.length === 0) break;
 
     for (const tc of turnToolCalls) {
       let result: string;

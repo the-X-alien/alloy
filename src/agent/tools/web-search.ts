@@ -4,30 +4,37 @@ export function createWebSearchTool(): ToolHandler {
   return {
     schema: {
       name: "web_search",
-      description: "Search the web using DuckDuckGo. Returns up to 8 results with titles, snippets, and URLs.",
+      description: "Search the web using DuckDuckGo. Returns up to 10 results with titles, snippets, and URLs.",
       inputSchema: {
         type: "object",
         properties: {
           query: { type: "string", description: "Search query" },
-          maxResults: { type: "number", description: "Max results (1-20, default 8)" },
+          maxResults: { type: "number", description: "Max results (1-15, default 8)" },
         },
         required: ["query"],
       },
     },
     execute: async (args) => {
       const query = String(args.query);
-      const maxResults = Math.min(Math.max(Number(args.maxResults ?? 8), 1), 20);
+      const maxResults = Math.min(Math.max(Number(args.maxResults ?? 8), 1), 15);
 
       try {
-        const url = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
+        const url = "https://html.duckduckgo.com/html/";
         const resp = await fetch(url, {
+          method: "POST",
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html",
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "text/html",
           },
-          signal: AbortSignal.timeout(15000),
+          body: "q=" + encodeURIComponent(query),
+          signal: AbortSignal.timeout(20000),
         });
         const html = await resp.text();
+
+        if (html.includes("anomaly") || html.includes("select all squares")) {
+          return `Search temporarily blocked for "${query}". DuckDuckGo requires a CAPTCHA. Try again later or use a more specific query.`;
+        }
 
         const results = parseDuckDuckGoResults(html, maxResults);
 
@@ -46,7 +53,7 @@ export function createWebSearchTool(): ToolHandler {
         return lines.join("\n");
       } catch (err: any) {
         if (err?.name === "TimeoutError" || err?.name === "AbortError") {
-          return `Search timed out for "${query}". DuckDuckGo may be rate-limiting. Try a more specific query.`;
+          return `Search timed out for "${query}". Try a more specific query.`;
         }
         return `Search failed: ${err?.message ?? "Unknown error"}`;
       }
@@ -62,31 +69,25 @@ interface SearchResult {
 
 function parseDuckDuckGoResults(html: string, maxResults: number): SearchResult[] {
   const results: SearchResult[] = [];
+  const resultBlocks = html.split('<div class="result results_links results_links_deep web-result ');
 
-  const linkRegex = /<a[^>]*rel="nofollow"[^>]*class="result-link"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-  const snippetRegex = /<td[^>]*class="result-snippet"[^>]*>([\s\S]*?)<\/td>/gi;
+  for (let i = 1; i < resultBlocks.length && results.length < maxResults; i++) {
+    const block = resultBlocks[i];
 
-  const links: { url: string; title: string }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = linkRegex.exec(html)) !== null) {
-    let url = m[1];
-    let title = m[2].replace(/<[^>]+>/g, "").trim();
-    if (url.startsWith("//")) url = "https:" + url;
-    if (!url.startsWith("http")) url = "https://" + url;
-    links.push({ url, title });
-  }
+    const titleMatch = block.match(/<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!titleMatch) continue;
 
-  const snippets: string[] = [];
-  while ((m = snippetRegex.exec(html)) !== null) {
-    snippets.push(m[1].replace(/<[^>]+>/g, "").trim());
-  }
+    const url = titleMatch[1];
+    const title = titleMatch[2].replace(/<[^>]+>/g, "").trim();
 
-  for (let i = 0; i < Math.min(links.length, maxResults); i++) {
-    results.push({
-      title: links[i].title || "(no title)",
-      url: links[i].url,
-      snippet: snippets[i] || "",
-    });
+    const snippetMatch = block.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i);
+    const snippet = snippetMatch
+      ? snippetMatch[1].replace(/<[^>]+>/g, "").trim()
+      : "";
+
+    if (title && url) {
+      results.push({ title, url, snippet });
+    }
   }
 
   return results;
