@@ -78,6 +78,7 @@ export class GoogleProvider implements Provider {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let fcIndex = 0;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -99,11 +100,14 @@ export class GoogleProvider implements Provider {
                 yield { type: "text" as const, content: part.text };
               }
               if (part.functionCall) {
+                fcIndex++;
                 const fc = part.functionCall;
-                yield { type: "tool_call_start" as const, id: fc.name ?? "fc_1", name: fc.name ?? "" };
+                const id = `fc_${fcIndex}`;
+                yield { type: "tool_call_start" as const, id, name: fc.name ?? "" };
                 if (fc.args) {
-                  yield { type: "tool_call_delta" as const, id: fc.name ?? "fc_1", delta: JSON.stringify(fc.args) };
+                  yield { type: "tool_call_delta" as const, id, delta: JSON.stringify(fc.args) };
                 }
+                yield { type: "tool_call_end" as const, id, name: fc.name ?? "" };
               }
             }
           } catch { }

@@ -70,6 +70,12 @@ export class AnthropicProvider implements Provider {
       if (event.type === "content_block_delta" && event.delta.type === "input_json_delta") {
         yield { type: "tool_call_delta" as const, id: toolId, delta: event.delta.partial_json };
       }
+
+      if (event.type === "content_block_stop" && toolId) {
+        yield { type: "tool_call_end" as const, id: toolId, name: toolName };
+        toolId = "";
+        toolName = "";
+      }
     }
   }
 

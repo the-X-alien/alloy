@@ -132,6 +132,8 @@ export class BedrockProvider implements Provider {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentToolId = "";
+      let currentToolName = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -154,12 +156,21 @@ export class BedrockProvider implements Provider {
 
             if (parsed.contentBlockStart?.start?.toolUse) {
               const tu = parsed.contentBlockStart.start.toolUse;
-              yield { type: "tool_call_start" as const, id: tu.toolUseId, name: tu.name };
+              currentToolId = tu.toolUseId;
+              currentToolName = tu.name;
+              yield { type: "tool_call_start" as const, id: currentToolId, name: currentToolName };
             }
 
             if (parsed.contentBlockDelta?.delta?.toolUse?.input) {
               const input = parsed.contentBlockDelta.delta.toolUse.input;
-              yield { type: "tool_call_delta" as const, id: "bedrock_1", delta: JSON.stringify(input) };
+              const inputStr = typeof input === "string" ? input : JSON.stringify(input);
+              yield { type: "tool_call_delta" as const, id: currentToolId, delta: inputStr };
+            }
+
+            if (parsed.contentBlockStop && currentToolId) {
+              yield { type: "tool_call_end" as const, id: currentToolId, name: currentToolName };
+              currentToolId = "";
+              currentToolName = "";
             }
           } catch {
             const match = trimmed.match(/{[^}]*"text"[^}]*}/);
